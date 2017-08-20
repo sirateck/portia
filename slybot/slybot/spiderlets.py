@@ -5,7 +5,6 @@ Spider middleware for AS for completing the work made by AS with a "spiderlet" c
 from __future__ import absolute_import
 import pkgutil, inspect
 
-from scrapy.xlib.pydispatch import dispatcher
 from scrapy import signals
 from scrapy.exceptions import NotConfigured
 from scrapy.http import Request
@@ -57,14 +56,15 @@ def _load_spiderlet(spiderlets_module_path, spider):
 class SpiderletsMiddleware(object):
     @classmethod
     def from_crawler(cls, crawler):
-        return cls(crawler.settings)
+        spider = cls(crawler.settings)
+        crawler.signals.connect(spider.spider_opened, signals.spider_opened)
+        return spider
 
     def __init__(self, settings):
         self.annotating = "annotating" in settings.getlist('SHUB_JOB_TAGS')
         self.spiderlets_module_path = settings["SPIDERLETS_MODULE"]
         if not self.spiderlets_module_path:
             raise NotConfigured
-        dispatcher.connect(self.spider_opened, signals.spider_opened)
 
     def spider_opened(self, spider):
         self.spiderlet = _load_spiderlet(self.spiderlets_module_path, spider)

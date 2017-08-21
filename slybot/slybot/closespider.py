@@ -7,7 +7,6 @@ have been extracted along the last time interval of same length.
 
 from twisted.internet import task
 
-from scrapy.xlib.pydispatch import dispatcher
 from scrapy import signals
 from scrapy.exceptions import NotConfigured
 
@@ -27,9 +26,9 @@ class SlybotCloseSpider(object):
 
         self.items_in_period = 0
 
-        dispatcher.connect(self.spider_opened, signal=signals.spider_opened)
-        dispatcher.connect(self.spider_closed, signal=signals.spider_closed)
-        dispatcher.connect(self.item_scraped, signal=signals.item_scraped)
+        crawler.signals.connect(self.spider_opened, signal=signals.spider_opened)
+        crawler.signals.connect(self.spider_closed, signal=signals.spider_closed)
+        crawler.signals.connect(self.item_scraped, signal=signals.item_scraped)
 
     def spider_opened(self, spider):
         self.task = task.LoopingCall(self._check_crawled_items, spider)

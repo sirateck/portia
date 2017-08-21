@@ -75,3 +75,8 @@ templates = {
     'ITEMS': _ITEMS_TEMPLATE,
     'EXTRACTORS': _EXTRACTORS_TEMPLATE
 }
+
+try:
+    from local_templates import *
+except ImportError:
+    pass

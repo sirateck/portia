@@ -107,6 +107,7 @@ USE_TZ = True
 PORTIA_STORAGE_BACKEND = 'storage.backends.FsStorage'
 
 SCHEDULE_URL = 'http://localhost:6800/schedule.json'
+ADDVERSION_URL = 'http://localhost:6800/addversion.json'
 
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (

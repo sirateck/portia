@@ -77,9 +77,14 @@ class SpiderRoute(ProjectDownloadMixin, BaseProjectModelRoute):
 
     @detail_route(methods=['post'])
     def schedule(self, *args, **kwargs):
+
+        self._deploy(self.project)
+
         spider_id = self.data['data']['id']
         schedule_data = self._schedule_data(spider_id, self.data)
         request = requests.post(settings.SCHEDULE_URL, data=schedule_data)
+        import logging
+        logging.info('SCHEDULE_URL: %s' % settings.SCHEDULE_URL)
         if request.status_code != 200:
             raise JsonApiGeneralException(
                 request.status_code, request.content)
@@ -103,3 +108,43 @@ class SpiderRoute(ProjectDownloadMixin, BaseProjectModelRoute):
             commit_id = self.storage._commit.id
             data['version'] = commit_id
         return data
+
+    def _deploy(self,project,version=None):
+        import time
+        import shutil
+        if not version:
+            version = str(int(time.time()))
+            
+        egg, tmpDir = self._build_egg(project.name);
+        with open(egg, 'rb') as f:
+            eggdata = f.read()
+        if(tmpDir):
+            shutil.rmtree(tmpDir)
+        addversion_data = {
+            'project': project.name,
+            'version': version,
+            'egg': eggdata,
+        }
+        request = requests.post(settings.ADDVERSION_URL, data=addversion_data)
+        if request.status_code != 200:
+            raise JsonApiGeneralException(
+                request.status_code, request.content)
+
+    def _build_egg(self,projectName):
+        import glob
+        import tempfile
+        from subprocess import check_call
+        import sys
+        from scrapy.utils.python import retry_on_eintr
+        import os
+
+        os.chdir(os.path.join(settings.MEDIA_ROOT,projectName))
+        d = tempfile.mkdtemp(prefix="scrapydeploy-")
+        o = open(os.path.join(d, "stdout"), "wb")
+        e = open(os.path.join(d, "stderr"), "wb")
+        retry_on_eintr(check_call, [sys.executable, 'setup.py', 'clean', '-a', 'bdist_egg', '-d', d],
+                       stdout=o, stderr=e)
+        o.close()
+        e.close()
+        egg = glob.glob(os.path.join(d, '*.egg'))[0]
+        return egg, d

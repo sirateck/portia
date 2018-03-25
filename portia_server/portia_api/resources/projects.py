@@ -1,6 +1,7 @@
 from collections import OrderedDict
 
 from django.utils.functional import cached_property
+from dulwich.objects import Commit
 from rest_framework.decorators import detail_route
 from rest_framework.response import Response
 from rest_framework.status import HTTP_200_OK, HTTP_201_CREATED
@@ -26,6 +27,7 @@ class ProjectDownloadMixin(object):
         fmt = self.query.get('format', 'spec')
         version = self.query.get('version', None)
         branch = self.query.get('branch', None)
+        selector = self.query.get('selector') or 'css'
         spider_id = self.kwargs.get('spider_id', None)
         spiders = [spider_id] if spider_id is not None else None
         try:
@@ -34,6 +36,8 @@ class ProjectDownloadMixin(object):
             raise JsonApiNotFoundError(str(e))
         if hasattr(self.storage, 'checkout') and (version or branch):
             try:
+                if version and len(version) < 40:
+                    version = self.commit_from_short_sha(version).id
                 self.storage.checkout(version, branch)
             except IOError:
                 pass
@@ -41,11 +45,25 @@ class ProjectDownloadMixin(object):
                 raise JsonApiNotFoundError(str(e))
         archiver = CodeProjectArchiver if fmt == u'code' else ProjectArchiver
         try:
-            content = archiver(self.storage).archive(spiders)
+            content = archiver(self.storage).archive(
+                spiders, selector=selector)
         except IOError as e:
             raise JsonApiNotFoundError(str(e))
-        return FileResponse('{}.zip'.format(self.project.name), content,
-                            status=HTTP_200_OK)
+        try:
+            name = u'{}.zip'.format(self.project.name).encode('ascii')
+        except UnicodeEncodeError:
+            name = str(self.project.id)
+        return FileResponse(name, content, status=HTTP_200_OK)
+
+    def commit_from_short_sha(self, version):
+        for oid in self.storage.repo._repo.object_store:
+            if oid.startswith(version):
+                obj = self.storage.repo._repo.get_object(oid)
+                if isinstance(obj, Commit):
+                    return obj
+        raise JsonApiNotFoundError(
+            'Could not find commit for `{}`'.format(version)
+        )
 
 
 class BaseProjectRoute(JsonApiRoute):
@@ -178,6 +196,25 @@ class ProjectRoute(ProjectDownloadMixin, BaseProjectRoute,
                     '", "'.join(e.args[0])))
         response = self.retrieve()
         return Response(response.data, status=HTTP_201_CREATED)
+
+    @detail_route(methods=['post'])
+    def rollback(self, *args, **kwargs):
+        if not self.storage.version_control and hasattr(self.storage, 'repo'):
+            raise JsonApiFeatureNotAvailableError()
+        version = self.query.get('version')
+        branch = self.query.get('branch')
+        if not (branch or version):
+            raise JsonApiBadRequestError(
+                'Need either `branch` or `version` arguments to rollback to')
+
+        if branch:
+            commit = self.storage.repo.refs['refs/heads/{}'.format(branch)]
+        else:
+            commit = self.commit_from_short_sha(version).id
+        self.storage.repo.refs['refs/heads/master'] = commit
+        self.storage.commit()
+        self.deploy()
+        return self.retrieve()
 
     def get_instance(self):
         return self.project

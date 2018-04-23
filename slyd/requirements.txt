@@ -1,5 +1,4 @@
 # Slyd requirements
---allow-all-external
 twisted==17.9.0
 pyOpenSSL==17.3.0
 service_identity==17.0.0
@@ -13,4 +12,5 @@ retrying==1.3.3
 mock==2.0.0
 
 # Splash dev
-https://github.com/scrapinghub/splash/archive/2.3.x.tar.gz#egg=splash
+# --allow-all-external=splash
+# https://github.com/scrapinghub/splash/archive/2.3.x.tar.gz#egg=splash

@@ -4,7 +4,7 @@ pyOpenSSL==17.3.0
 service_identity==17.0.0
 requests==2.18.4
 autobahn==17.9.3
-six==1.11.0
+six==1.10.0
 chardet==3.0.4
 parse==1.8.2
 ndg-httpsclient==0.4.3
